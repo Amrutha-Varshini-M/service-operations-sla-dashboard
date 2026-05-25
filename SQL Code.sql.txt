@@ -1,0 +1,104 @@
+--How many tickets were handled by each agent and how many of their first responses were within SLA?
+SELECT agent_name,
+       COUNT(ticket_id) AS number_of_tickets,
+       SUM(CASE WHEN first_response_sla_validation = 'Yes' THEN 1 ELSE 0 END) AS sla_validation
+FROM 'technical_support_dataset_cleaned.xlsx'
+GROUP BY agent_name
+ORDER BY sla_validation DESC;
+
+--What is the rate of resolution based on priority?
+SELECT priority,
+       ROUND(100.0 * SUM(CASE 
+       WHEN resolution_sla_validation = 'Yes' 
+       THEN 1 
+       ELSE 0 
+       END) / COUNT(resolution_sla_validation), 2) AS resolution_rate
+FROM 'technical_support_dataset_cleaned.xlsx'
+GROUP BY priority
+ORDER BY (CASE 
+    WHEN priority = 'High' THEN 1 
+    WHEN priority = 'Medium' THEN 2 
+    WHEN priority = 'Low' THEN 3 
+    ELSE 0 END);
+
+--What is the average time of handling by each agent?
+SELECT agent_name,
+       ROUND(AVG(EXTRACT(EPOCH FROM actual_resolution_duration))::DOUBLE, 2) AS average_time_seconds
+FROM 'technical_support_dataset_cleaned.xlsx'
+GROUP BY agent_name;
+
+--How many customers are satisfied with the resolution? Rank the number of ratings in a scale of 1 - 5.
+SELECT rating,
+COUNT(rating) as customer_satisfaction_score
+FROM 'technical_support_dataset_cleaned.xlsx'
+WHERE rating != 'nan'
+GROUP BY rating
+ORDER BY rating DESC;
+
+--What percentage of tickets violate SLA?
+SELECT ROUND(
+100* SUM(CASE WHEN first_response_sla_validation = 'No' AND resolution_sla_validation = 'No' THEN 1
+ELSE 0 END) / COUNT(*),2) AS sla_violation
+FROM 'technical_support_dataset_cleaned.xlsx';
+
+--Which category violates SLA the most?
+SELECT topic,
+ROUND (100 * SUM (CASE WHEN first_response_sla_validation = 'No' AND resolution_sla_validation = 'No' THEN 1
+ELSE 0 END) / COUNT(*) , 2) AS sla_violation
+FROM 'technical_support_dataset_cleaned.xlsx'
+GROUP BY topic
+ORDER BY sla_violation DESC;
+
+--Which country violates SLA the most?
+SELECT country,
+ROUND(SUM(CASE WHEN first_response_sla_validation = 'No' AND resolution_sla_validation = 'No' THEN 1
+ELSE 0 END) / COUNT(*) * 100, 2) AS sla_violation
+FROM 'technical_support_dataset_cleaned.xlsx'
+GROUP BY country
+ORDER BY sla_violation DESC;
+
+--Which agents get poor ratings?
+SELECT agent_name,
+ROUND(AVG(rating), 2) AS average_rating
+FROM 'technical_support_dataset_cleaned.xlsx'
+WHERE rating != 'nan'
+GROUP BY agent_name
+ORDER BY average_rating DESC;
+
+--Which channel is faster?
+SELECT channel,
+ROUND(AVG(EXTRACT(EPOCH FROM actual_resolution_duration))::DOUBLE, 2) AS average_time_seconds
+FROM 'technical_support_dataset_cleaned.xlsx'
+GROUP BY channel
+ORDER BY average_time_seconds DESC;
+
+--Which channel causes more escalations?
+SELECT channel,
+COUNT (ticket_id) AS escalation
+FROM 'technical_support_dataset_cleaned.xlsx'
+GROUP BY channel
+ORDER BY COUNT(ticket_id) DESC;
+
+--Which products generate most complaints?
+SELECT product_group,
+COUNT(ticket_id) AS complaints
+FROM 'technical_support_dataset_cleaned.xlsx'
+GROUP BY product_group
+ORDER BY COUNT(ticket_id) DESC;
+
+--Which topic takes the longest time to resolve and is the most escalated among ready to use software?
+SELECT topic,
+ROUND(AVG(EXTRACT(EPOCH FROM actual_resolution_duration))::DOUBLE, 2) AS average_time_seconds,
+COUNT(ticket_id) AS escalation
+FROM 'technical_support_dataset_cleaned.xlsx'
+WHERE product_group = 'Ready to use Software'
+GROUP BY topic
+ORDER BY average_time_seconds DESC, escalation DESC;
+
+--Highest priority tickets of which region has the highest SLA resolution breach?
+SELECT country,
+COUNT(CASE WHEN resolution_sla_validation = 'NO' THEN 1 ELSE 0 END) as sla_breach
+FROM 'technical_support_dataset_cleaned.xlsx'
+WHERE priority = 'High'
+GROUP BY country
+ORDER BY sla_breach DESC;
